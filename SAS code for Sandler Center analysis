@@ -1,0 +1,193 @@
+FILENAME REFFILE '/home/u49598231/sasuser.v94/Final project - Evaluating Sandler Center programs effectiveness_February 24, 2022_19.38.csv';
+
+PROC IMPORT DATAFILE=REFFILE
+	DBMS=CSV
+	OUT=WORK.IMPORT;
+	GETNAMES=YES;	
+RUN;
+
+PROC CONTENTS DATA=WORK.IMPORT; RUN;
+%LET N=16;
+proc format;
+	invalue events
+		" " = 0
+		"Blood alcohol content levels" = 1
+		"Standard drink sizes - using a red solo" = 1
+		"Tailgating safety" = 1
+		"helping someone in the red zone " = 1
+		"Calories in alcohol" = 1
+		"Drugged drink - at Canes Night Live" = 1
+		"Mixing drugs & alcohol" = 1
+		"Staying in the green zone" = 1
+		"Drinking games -  drunk goggle jenga" = 1
+		"Scenarios about BAC levels" = 1
+		"Bystander intervention" = 1
+		"Going out safety for fall break" = 1
+		"Consent & alcohol" = 1
+		"Drunk driving event" = 1
+		"Dangers of vaping" = 1
+		"Edible safety" = 1
+		"Dangers of cocaine" = 1
+		"Unsure" = 1;
+		
+	invalue school
+		"First year" = 1
+		"Second year" = 2
+		"Third year" = 3
+		"Fourth year" = 4
+		"Graduate student/law student/Med student" = 5;
+	value grade 
+	    1="First year"
+	    2="second year"
+	    3="Third year"
+	    4="Fourth year"
+	    5="Graduate student/ law student/ Med student"; 
+	invalue living
+		"Off-campus" = 0
+		"On-campus" = 1;
+	value campus 
+	    0="Off-campus"
+	    1="On-campus"; 
+	invalue rate
+		"Poor" = 0
+		"Fair" = 1
+		"Good" = 2
+		"Excellent" = 3;
+    value rating 
+        0="Poor"
+        1="Fair"
+        2="Good"
+        3="Excellent"; 
+	invalue sex
+		"Woman" = 0
+		"Man" = 1
+		"Transgender" = 2
+		"Non-binary" = 3
+		"Other-not listed" = 4;
+	value is_Males  
+	    0="Woman"
+	    1="Man"
+	    2="Transgender"
+	    3="Other";
+	invalue change
+		"No" = 0
+		"Yes" = 1;
+	value prompt
+		0 = "No"
+		1 = "Yes";
+	invalue intervention
+		"Strongly disagree"= 0
+		"Disagree" = 1
+		"Agree" = 2
+		"Strongly agree" = 3;
+	value stand
+		0 = "strongly disagree"
+		1 = "disagree"
+		2 = "Agree"
+		3 = "strongly agree";
+data report;
+set import;
+if _n_ < 3 then delete;
+length school $25;
+length gender $14; 
+length living_arrangement $16;
+length event_attended $60;
+length rate_experience $15; 
+length prompt_change $10;  
+length bystander_intervention $15;
+prompt_change=Q31;
+rate_experience=Q28;
+Living_arrangement=Q4;
+gender=Q2;
+school_year = Q3;
+bystander_intervention=bystander; 
+schools=input(school_year, school.);
+is_male=input(gender, sex.);
+experience=input(rate_experience, rate.);
+housing=input(living_arrangement, living.);
+intervene=input(bystander_intervention, intervention.);
+is_change=input(prompt_change,change.);
+array event (16) $40 ;
+
+do i=1 to dim(event);
+	event(i) = scan (Q6, i,",");
+end;
+array event_attend (16);
+do j=1 to dim(event_attend);
+	event_attend(j) = input(event(j), events.);
+end;
+event_count=sum(of event_attend1-event_attend16);
+format is_change prompt. is_male is_males. housing campus.;
+run;
+data bystander_program;
+set report(keep=schools is_male experience housing intervene);
+if intervene eq . then delete;
+format intervene stand.;
+run;
+proc print data=bystander_program(obs=5);
+var schools intervene;
+run;
+proc print data=report (obs=15);
+
+var schools is_male experience housing intervene;
+run;
+proc corr data=report;
+var schools experience;
+run;
+proc reg data=report;
+model schools=experience/clb;
+run;
+proc sgplot data=report;
+title "Graph showing school year and their rating of experience with the Sandler Center";
+vbox experience / category=schools;
+run;
+Title "One way anova school year and behavior change"; 
+proc glm data=report; 
+class school_year; 
+model is_change = school_year; 
+means school_year/ hovtest=levene welch plots=none;
+lsmeans school_year / adjust=tukey pdiff alpha=.05; 
+run; 
+Title "School year and event attended";
+proc glm data=report; 
+class school_year; 
+model event_count = school_year; 
+means school_year/ hovtest=levene welch plots=none;
+lsmeans school_year / adjust=tukey pdiff alpha=.05;
+run;
+Title "Gender and behavior change";
+proc glm data=report; 
+class is_male; 
+model is_change = is_male; 
+means is_male/ hovtest=levene welch plots=none;
+lsmeans is_male / adjust=tukey pdiff alpha=.05;
+run; 
+TItle "Living situation vs Behavior change";
+proc glm data=report; 
+class housing; 
+model is_change = housing; 
+means housing/ hovtest=levene welch plots=none;
+lsmeans housing / adjust=tukey pdiff alpha=.05;
+run; 
+TItle "events attended vs Behavior change";
+proc glm data=report; 
+class is_change; 
+model event_count = is_change; 
+means is_change/ hovtest=levene welch plots=none;
+lsmeans is_change / adjust=tukey pdiff alpha=.05;
+run; 
+TITLE "event attended vs housing";
+proc glm data=report; 
+class housing; 
+model event_count = housing; 
+means housing/ hovtest=levene welch plots=none;
+lsmeans housing/ adjust=tukey pdiff alpha=.05;
+run;
+TITLE " One way ANOVA event attended vs intervene";
+proc glm data=report; 
+class intervene; 
+model event_count = intervene; 
+means intervene/ hovtest=levene welch plots=none;
+lsmeans intervene/ adjust=tukey pdiff alpha=.05;
+run;
+quit;
