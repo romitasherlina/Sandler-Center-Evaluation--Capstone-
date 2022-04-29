@@ -1,13 +1,13 @@
+
 FILENAME REFFILE '/home/u49598231/sasuser.v94/Final project - Evaluating Sandler Center programs effectiveness_February 24, 2022_19.38.csv';
 
 PROC IMPORT DATAFILE=REFFILE
 	DBMS=CSV
 	OUT=WORK.IMPORT;
-	GETNAMES=YES;	
+	GETNAMES=YES;
 RUN;
 
 PROC CONTENTS DATA=WORK.IMPORT; RUN;
-%LET N=16;
 proc format;
 	invalue events
 		" " = 0
@@ -68,7 +68,8 @@ proc format;
 	    0="Woman"
 	    1="Man"
 	    2="Transgender"
-	    3="Other";
+	    3="non-binary"
+	    4 = "other";
 	invalue change
 		"No" = 0
 		"Yes" = 1;
@@ -87,7 +88,9 @@ proc format;
 		3 = "strongly agree";
 data report;
 set import;
+/*deleting the first three obs */
 if _n_ < 3 then delete;
+/*changing the length of these variables*/
 length school $25;
 length gender $14; 
 length living_arrangement $16;
@@ -95,28 +98,35 @@ length event_attended $60;
 length rate_experience $15; 
 length prompt_change $10;  
 length bystander_intervention $15;
+/*changing the imported variables names to identifying ones*/
 prompt_change=Q31;
 rate_experience=Q28;
 Living_arrangement=Q4;
 gender=Q2;
 school_year = Q3;
 bystander_intervention=bystander; 
+/*changing the variables to be numeric*/
 schools=input(school_year, school.);
 is_male=input(gender, sex.);
 experience=input(rate_experience, rate.);
 housing=input(living_arrangement, living.);
 intervene=input(bystander_intervention, intervention.);
 is_change=input(prompt_change,change.);
+/*separting the number of events attended within variable Q6 and 
+using dimlimter "," to separate the events*/
+
 array event (16) $40 ;
 
 do i=1 to dim(event);
 	event(i) = scan (Q6, i,",");
 end;
+/* creating the varaible event_attended based on the number of events that appeared
+ in the array event where if they attended the event it is a one if not its a zero*/
 array event_attend (16);
 do j=1 to dim(event_attend);
 	event_attend(j) = input(event(j), events.);
 end;
-event_count=sum(of event_attend1-event_attend16);
+event_count=sum(of event_attend1-event_attend16); /*adding up the sum of the number of events attended*/
 format is_change prompt. is_male is_males. housing campus.;
 run;
 data bystander_program;
@@ -124,6 +134,7 @@ set report(keep=schools is_male experience housing intervene);
 if intervene eq . then delete;
 format intervene stand.;
 run;
+/*printing out the variables */
 proc print data=bystander_program(obs=5);
 var schools intervene;
 run;
@@ -131,16 +142,19 @@ proc print data=report (obs=15);
 
 var schools is_male experience housing intervene;
 run;
+/*running a correlation analysis*/
 proc corr data=report;
 var schools experience;
 run;
 proc reg data=report;
 model schools=experience/clb;
 run;
+/*creating a box graph by experience and school*/
 proc sgplot data=report;
 title "Graph showing school year and their rating of experience with the Sandler Center";
 vbox experience / category=schools;
 run;
+/*running a one way anova on school year and behavior change*/
 Title "One way anova school year and behavior change"; 
 proc glm data=report; 
 class school_year; 
@@ -148,6 +162,7 @@ model is_change = school_year;
 means school_year/ hovtest=levene welch plots=none;
 lsmeans school_year / adjust=tukey pdiff alpha=.05; 
 run; 
+/*running a one way anova on school year and events attended*/
 Title "School year and event attended";
 proc glm data=report; 
 class school_year; 
@@ -155,6 +170,7 @@ model event_count = school_year;
 means school_year/ hovtest=levene welch plots=none;
 lsmeans school_year / adjust=tukey pdiff alpha=.05;
 run;
+/*running a one way anova on gender and reported behavior change*/
 Title "Gender and behavior change";
 proc glm data=report; 
 class is_male; 
@@ -162,6 +178,7 @@ model is_change = is_male;
 means is_male/ hovtest=levene welch plots=none;
 lsmeans is_male / adjust=tukey pdiff alpha=.05;
 run; 
+/*running a one way anova on student housing stituation and reported behavior change*/
 TItle "Living situation vs Behavior change";
 proc glm data=report; 
 class housing; 
@@ -169,6 +186,7 @@ model is_change = housing;
 means housing/ hovtest=levene welch plots=none;
 lsmeans housing / adjust=tukey pdiff alpha=.05;
 run; 
+/*running a one way anova on number of events attended and reported behavior change*/
 TItle "events attended vs Behavior change";
 proc glm data=report; 
 class is_change; 
@@ -176,6 +194,7 @@ model event_count = is_change;
 means is_change/ hovtest=levene welch plots=none;
 lsmeans is_change / adjust=tukey pdiff alpha=.05;
 run; 
+/*running a one way anova on number of events attended and student's housing stituation*/
 TITLE "event attended vs housing";
 proc glm data=report; 
 class housing; 
@@ -183,6 +202,7 @@ model event_count = housing;
 means housing/ hovtest=levene welch plots=none;
 lsmeans housing/ adjust=tukey pdiff alpha=.05;
 run;
+/*running a one way anova on the number of events attended and whether the student would intervene*/
 TITLE " One way ANOVA event attended vs intervene";
 proc glm data=report; 
 class intervene; 
